@@ -41,6 +41,10 @@ impl Pass {
     }
 }
 
+fn sum_between(start: u32, end: u32) -> u32 {
+    (end - start + 1) * (start + end) / 2
+}
+
 fn main() {
     let input = include_bytes!("input");
     let passes = unsafe {
@@ -49,16 +53,18 @@ fn main() {
         slice::from_raw_parts(ptr, len)
     };
 
-    let mut ids: Vec<u32> = passes.iter().map(Pass::id).collect();
-    ids.sort_unstable();
+    let mut min_id = u32::MAX;
+    let mut max_id = 0;
+    let mut sum_ids = 0;
 
-    println!("Part 1: {}", ids.last().unwrap());
+    for pass in passes {
+        let id = pass.id();
 
-    let missing = ids
-        .windows(2)
-        .find(|&window| window[1] - window[0] > 1)
-        .unwrap()[0]
-        + 1;
+        min_id = min_id.min(id);
+        max_id = max_id.max(id);
+        sum_ids += id;
+    }
 
-    println!("Part 2: {}", missing);
+    println!("Part 1: {}", max_id);
+    println!("Part 2: {}", sum_between(min_id, max_id) - sum_ids);
 }
