@@ -49,6 +49,16 @@ fn main() {
         slice::from_raw_parts(ptr, len)
     };
 
-    let highest_id = passes.iter().map(Pass::id).max().unwrap();
-    println!("Part 1: {}", highest_id);
+    let mut ids: Vec<u32> = passes.iter().map(Pass::id).collect();
+    ids.sort_unstable();
+
+    println!("Part 1: {}", ids.last().unwrap());
+
+    let missing = ids
+        .windows(2)
+        .find(|&window| window[1] - window[0] > 1)
+        .unwrap()[0]
+        + 1;
+
+    println!("Part 2: {}", missing);
 }
