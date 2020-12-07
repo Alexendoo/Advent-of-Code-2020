@@ -1,12 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 
-fn bag_name(input: &str) -> &str {
-    let end = input.find(" bag").unwrap();
-
-    &input[..end]
-}
-
 #[derive(Copy, Clone, Debug)]
 struct Edge {
     parent: &'static str,
@@ -14,34 +8,47 @@ struct Edge {
     count: usize,
 }
 
-fn direct_parents<'a>(bag: &'a str, edges: &'a [Edge]) -> impl Iterator<Item = &'a str> {
+fn find_edges<'a, F>(edges: &'a [Edge], bag: &'a str, f: F) -> impl Iterator<Item = Edge> + 'a
+where
+    F: Fn(&Edge) -> &str + 'a,
+{
     let start = edges
-        .binary_search_by(|&edge| edge.child.cmp(bag).then(Ordering::Greater))
+        .binary_search_by(|edge| f(edge).cmp(bag).then(Ordering::Greater))
         .unwrap_err();
 
-    edges
+    edges[start..]
         .iter()
+        .take_while(move |edge| f(edge) == bag)
         .copied()
-        .skip(start)
-        .take_while(move |&edge| edge.child == bag)
-        .map(|edge| edge.parent)
 }
 
-fn all_parents<'a>(bag: &'a str, edges: &'a [Edge]) -> HashSet<&'a str> {
+fn parents<'a>(edges: &'a [Edge], bag: &'a str) -> HashSet<&'a str> {
     let mut queue = vec![bag];
     let mut found = HashSet::new();
 
     while let Some(next) = queue.pop() {
-        let start_len = queue.len();
-
-        queue.extend(direct_parents(next, edges));
-        found.extend(&queue[start_len..]);
+        for edge in find_edges(edges, next, |edge| edge.child) {
+            queue.push(edge.parent);
+            found.insert(edge.parent);
+        }
     }
 
     found
 }
 
-fn main() {
+fn children(edges: &[Edge], bag: &str) -> usize {
+    find_edges(edges, bag, |edge| edge.parent)
+        .map(|edge| edge.count + edge.count * children(edges, edge.child))
+        .sum()
+}
+
+fn bag_name(input: &str) -> &str {
+    let end = input.find(" bag").unwrap();
+
+    &input[..end]
+}
+
+fn parse_edges() -> Vec<Edge> {
     let input = include_str!("input");
 
     let mut edges = Vec::new();
@@ -67,10 +74,15 @@ fn main() {
         }
     }
 
-    edges.sort_unstable_by_key(|&edge| edge.child);
-    eprintln!("edges = {:#?}", edges);
+    edges
+}
 
-    let containers = all_parents("shiny gold", &edges);
+fn main() {
+    let mut edges = parse_edges();
 
-    println!("Part 1: {}", containers.len());
+    edges.sort_unstable_by_key(|edge| edge.child);
+    println!("Part 1: {}", parents(&edges, "shiny gold").len());
+
+    edges.sort_unstable_by_key(|edge| edge.parent);
+    println!("Part 2: {}", children(&edges, "shiny gold"));
 }
