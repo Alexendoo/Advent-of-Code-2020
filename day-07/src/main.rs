@@ -7,29 +7,34 @@ fn bag_name(input: &str) -> &str {
     &input[..end]
 }
 
-type Edges = Vec<(&'static str, &'static str)>;
+#[derive(Copy, Clone, Debug)]
+struct Edge {
+    parent: &'static str,
+    child: &'static str,
+    count: usize,
+}
 
-fn find_containers_shallow<'a>(bag: &'a str, edges: &'a Edges) -> impl Iterator<Item = &'a str> {
+fn direct_parents<'a>(bag: &'a str, edges: &'a [Edge]) -> impl Iterator<Item = &'a str> {
     let start = edges
-        .binary_search_by(|&(_, containee)| containee.cmp(bag).then(Ordering::Greater))
+        .binary_search_by(|&edge| edge.child.cmp(bag).then(Ordering::Greater))
         .unwrap_err();
 
     edges
         .iter()
         .copied()
         .skip(start)
-        .take_while(move |&(_, containee)| containee == bag)
-        .map(|(container, _)| container)
+        .take_while(move |&edge| edge.child == bag)
+        .map(|edge| edge.parent)
 }
 
-fn find_containers_deep<'a>(bag: &'a str, edges: &'a Edges) -> HashSet<&'a str> {
+fn all_parents<'a>(bag: &'a str, edges: &'a [Edge]) -> HashSet<&'a str> {
     let mut queue = vec![bag];
     let mut found = HashSet::new();
 
     while let Some(next) = queue.pop() {
         let start_len = queue.len();
 
-        queue.extend(find_containers_shallow(next, edges));
+        queue.extend(direct_parents(next, edges));
         found.extend(&queue[start_len..]);
     }
 
@@ -42,7 +47,7 @@ fn main() {
     let mut edges = Vec::new();
 
     for line in input.lines() {
-        let container = bag_name(line);
+        let parent = bag_name(line);
 
         let contents = line.trim_start_matches(|ch: char| !ch.is_ascii_digit());
         if contents.is_empty() {
@@ -51,16 +56,21 @@ fn main() {
 
         for content in contents.split(", ") {
             let mut split = content.splitn(2, ' ');
-            let _count = split.next().unwrap();
-            let bag = bag_name(split.next().unwrap());
+            let count = split.next().unwrap().parse().unwrap();
+            let child = bag_name(split.next().unwrap());
 
-            edges.push((container, bag));
+            edges.push(Edge {
+                parent,
+                child,
+                count,
+            });
         }
     }
 
-    edges.sort_unstable_by_key(|&(_, containee)| containee);
+    edges.sort_unstable_by_key(|&edge| edge.child);
+    eprintln!("edges = {:#?}", edges);
 
-    let containers = find_containers_deep("shiny gold", &edges);
+    let containers = all_parents("shiny gold", &edges);
 
     println!("Part 1: {}", containers.len());
 }
