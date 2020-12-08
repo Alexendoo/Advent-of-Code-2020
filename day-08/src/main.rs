@@ -1,4 +1,6 @@
-#[derive(Debug)]
+use fixedbitset::FixedBitSet;
+
+#[derive(Debug, Copy, Clone)]
 enum Instruction {
     Acc,
     Jmp,
@@ -7,11 +9,10 @@ enum Instruction {
 
 use Instruction::*;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct Op {
     instruction: Instruction,
     argument: i32,
-    seen: bool,
 }
 
 impl Op {
@@ -26,34 +27,99 @@ impl Op {
         Self {
             instruction,
             argument: line[4..].parse().unwrap(),
-            seen: false,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct State<'a> {
+    ops: &'a [Op],
+    cursor: i32,
+    acc: i32,
+    seen: FixedBitSet,
+}
+
+impl<'a> State<'a> {
+    fn new(ops: &'a [Op]) -> Self {
+        Self {
+            ops: ops,
+            cursor: 0,
+            acc: 0,
+            seen: FixedBitSet::with_capacity(ops.len()),
+        }
+    }
+
+    fn next_op(&self) -> Op {
+        self.ops[self.cursor as usize]
+    }
+
+    fn execute(&mut self, op: Op) -> bool {
+        let seen = self.seen.put(self.cursor as usize);
+
+        self.cursor += match op.instruction {
+            Acc => {
+                self.acc += op.argument;
+
+                1
+            }
+            Jmp => op.argument,
+            Nop => 1,
+        };
+
+        seen
+    }
+
+    fn advance(&mut self) -> bool {
+        let next = self.next_op();
+
+        self.execute(next)
+    }
+
+    fn run_to_end(&mut self) -> bool {
+        loop {
+            let len = self.ops.len() as i32;
+
+            if self.cursor == len {
+                return true;
+            }
+
+            if self.cursor > len || self.advance() {
+                return false;
+            }
         }
     }
 }
 
 fn main() {
     let input = include_str!("input");
-    let mut ops: Vec<Op> = input.lines().map(Op::parse).collect();
+    let ops: Vec<Op> = input.lines().map(Op::parse).collect();
 
-    let mut index = 0;
-    let mut acc = 0;
+    let mut state = State::new(&ops);
+
+    state.run_to_end();
+
+    println!("Part 1: {}", state.acc);
+
+    let mut state = State::new(&ops);
     loop {
-        let next = &mut ops[index as usize];
-        if next.seen {
-            break;
-        }
+        let mut next = state.next_op();
 
-        match next.instruction {
+        next.instruction = match next.instruction {
+            Jmp => Nop,
+            Nop => Jmp,
+
             Acc => {
-                acc += next.argument;
-                index += 1;
+                state.advance();
+                continue;
             }
-            Jmp => index += next.argument,
-            Nop => index += 1,
         };
 
-        next.seen = true;
+        let mut test_state = state.clone();
+        test_state.execute(next);
+        if test_state.run_to_end() {
+            println!("Part 2: {}", test_state.acc);
+            break;
+        }
+        state.advance();
     }
-
-    println!("Part 1: {}", acc);
 }
