@@ -83,7 +83,7 @@ fn part_2(ops: &[Op]) {
 
                 let mut index_mask = x_mask;
 
-                for _ in 0..2u64.pow(x_mask.count_zeros()) {
+                for _ in 0..(1 << x_mask.count_zeros()) {
                     index_mask = x_mask | index_mask.overflowing_add(1).0;
 
                     memory.insert(index & index_mask, value);
