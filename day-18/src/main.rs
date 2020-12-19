@@ -21,6 +21,28 @@ fn calc(tokens: &mut impl Iterator<Item = char>) -> usize {
     carry
 }
 
+fn part_2() -> usize {
+    struct Int(usize);
+
+    impl std::ops::Add for Int {
+        type Output = Int;
+
+        fn add(self, other: Self) -> Self {
+            Self(self.0 + other.0)
+        }
+    }
+
+    impl std::ops::BitXor for Int {
+        type Output = Self;
+
+        fn bitxor(self, other: Self) -> Self {
+            Self(self.0 * other.0)
+        }
+    }
+
+    include!(concat!(env!("OUT_DIR"), "/part_2.rs")).0
+}
+
 fn main() {
     let input = include_str!("input");
 
@@ -30,4 +52,5 @@ fn main() {
         .sum();
 
     println!("Part 1: {}", sum);
+    println!("Part 2: {}", part_2());
 }
