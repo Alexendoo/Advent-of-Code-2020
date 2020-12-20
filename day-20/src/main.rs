@@ -27,38 +27,17 @@ impl Tile {
     }
 
     fn rotated(&self) -> Self {
-        // # . .
-        // . # .
-        // . # .
-
-        // . . .
-        // . # #
-        // # . .
-
-        let mut board = String::with_capacity(100);
-        for col in (0..10).rev() {
-            for row in 0..10 {
-                let i = row * 10 + col;
-                let ch = self.board[i..].chars().next().unwrap();
-                board.push(ch);
-            }
+        Self {
+            id: self.id,
+            board: rotate_board(&self.board),
         }
-
-        assert_eq!(board.len(), self.board.len());
-
-        Self { id: self.id, board }
     }
 
     fn flipped(&self) -> Self {
-        let mut board = String::with_capacity(100);
-
-        for row in (0..10).rev() {
-            board.extend(self.board.chars().rev().skip(row * 10).take(10));
+        Self {
+            id: self.id,
+            board: flip_board(&self.board),
         }
-
-        assert_eq!(board.len(), self.board.len());
-
-        Self { id: self.id, board }
     }
 
     fn sides(&self) -> Sides {
@@ -121,6 +100,99 @@ fn sqrt(u: usize) -> usize {
     (u as f64).sqrt() as usize
 }
 
+fn board_rows(board: &str, width: usize) -> Vec<&str> {
+    (0..(8 * width))
+        .map(|i| {
+            let start = i * width * 8;
+            let end = start + width * 8;
+
+            &board[start..end]
+        })
+        .collect()
+}
+
+fn rotate_board(board: &str) -> String {
+    let mut out = String::with_capacity(board.len());
+    let width = sqrt(board.len());
+
+    // # . .
+    // . # .
+    // . # .
+
+    // . . .
+    // . # #
+    // # . .
+
+    for col in (0..width).rev() {
+        for row in 0..width {
+            let i = row * width + col;
+            let ch = board[i..].chars().next().unwrap();
+            out.push(ch);
+        }
+    }
+
+    assert_eq!(board.len(), out.len());
+
+    out
+}
+
+fn flip_board(board: &str) -> String {
+    let mut out = String::with_capacity(board.len());
+    let width = sqrt(board.len());
+
+    for row in (0..width).rev() {
+        out.extend(board.chars().rev().skip(row * width).take(width));
+    }
+
+    assert_eq!(out.len(), board.len());
+
+    out
+}
+
+fn find_monsters(board: &str, width: usize) -> Option<String> {
+    let rows = board_rows(&board, width);
+
+    // 01234567890123456789
+    //                   #
+    // #    ##    ##    ###
+    //  #  #  #  #  #  #
+    let monster = &[
+        &[18][..],
+        &[0, 5, 6, 11, 12, 17, 18, 19],
+        &[1, 4, 7, 10, 13, 16],
+    ];
+
+    let mut out = board.as_bytes().to_vec();
+    let mut found = false;
+
+    for (start_row, window) in rows.windows(3).enumerate() {
+        for offset in 0..width * 8 - 20 {
+            let has_monster = monster.iter().enumerate().all(|(row, cols)| {
+                cols.iter()
+                    .all(|col| window[row][offset + col..].starts_with('#'))
+            });
+
+            if has_monster {
+                found = true;
+
+                for (row, &cols) in monster.iter().enumerate() {
+                    for col in cols {
+                        let i = offset + col + (row + start_row) * width * 8;
+
+                        out[i] = b'O';
+                    }
+                }
+            }
+        }
+    }
+
+    if found {
+        Some(String::from_utf8(out).unwrap())
+    } else {
+        None
+    }
+}
+
 fn main() {
     let tiles = parse();
 
@@ -165,9 +237,6 @@ fn main() {
         corners.iter().fold(1, |acc, tile| acc * tile.id)
     );
 
-    eprintln!("unpaired = {:#?}", unpaired);
-    eprintln!("corners = {:#?}", corners);
-
     let start_id = corners[0].id;
 
     let start = sides
@@ -183,8 +252,6 @@ fn main() {
             sides[&top].len() == 4 && sides[&left].len() == 4
         })
         .unwrap();
-
-    eprintln!("start = {:#?}", start);
 
     let width = sqrt(tiles.len());
 
@@ -210,24 +277,27 @@ fn main() {
 
         grid.push(next);
     }
-    eprintln!("grid = {:#?}", grid);
-    let mut complete_board = String::new();
+
+    let mut board = String::new();
     for grid_row in 0..width {
         for board_row in 0..8 {
             for grid_col in 0..width {
                 let grid_index = grid_row * width + grid_col;
-                complete_board.push_str(&grid[grid_index].row(board_row))
+                board.push_str(&grid[grid_index].row(board_row))
             }
         }
     }
 
-    dbg!(&complete_board);
-    dbg!(complete_board.len());
+    for _ in 0..4 {
+        if let Some(board) =
+            find_monsters(&board, width).or_else(|| find_monsters(&flip_board(&board), width))
+        {
+            let sea_tiles = board.chars().filter(|&ch| ch == '#').count();
 
-    for i in 0..(8 * width) {
-        let i = i * width * 8;
+            println!("Part 2: {}", sea_tiles);
+        }
 
-        println!("{}", &complete_board[i..i + 3 * 8]);
+        board = rotate_board(&board);
     }
 }
 
