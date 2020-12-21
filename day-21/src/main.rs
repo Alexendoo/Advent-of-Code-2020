@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 struct Food {
     ingredients: HashSet<&'static str>,
@@ -57,4 +57,16 @@ fn main() {
         .sum();
 
     println!("Part 1: {}", sum);
+
+    let mut dangerous_ingredients = BTreeMap::new();
+    while let Some((&allergen, ingredients)) = allergens.iter().find(|(_, v)| v.len() == 1) {
+        let ingredient = *ingredients.iter().next().unwrap();
+        dangerous_ingredients.insert(allergen, ingredient);
+
+        allergens.values_mut().for_each(|v| {
+            v.remove(ingredient);
+        });
+    }
+
+    println!("Part 2: {}", dangerous_ingredients.values().join(","));
 }
