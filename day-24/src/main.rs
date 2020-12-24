@@ -1,7 +1,7 @@
+use derive_more::{Add, AddAssign};
 use std::collections::HashSet;
 
-use derive_more::{Add, Sum};
-#[derive(Add, Sum, Hash, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Add, AddAssign, Hash, PartialEq, Eq, Clone, Copy, Debug)]
 struct Coord {
     x: i32,
     y: i32,
@@ -12,43 +12,92 @@ impl Coord {
     const fn new(x: i32, y: i32, z: i32) -> Self {
         Self { x, y, z }
     }
+
+    fn neighbours(self) -> impl Iterator<Item = Coord> {
+        NEIGHBOURS
+            .iter()
+            .copied()
+            .map(move |neighbour| self + neighbour)
+    }
+
+    fn nearby(self, flipped: &HashSet<Self>) -> usize {
+        self.neighbours()
+            .filter(|neighbour| flipped.contains(&neighbour))
+            .count()
+    }
 }
 
-fn parse() -> impl Iterator<Item = Vec<Coord>> {
-    let input = include_str!("input");
+const NEIGHBOURS: [Coord; 6] = [
+    Coord::new(1, -1, 0),
+    Coord::new(0, -1, 1),
+    Coord::new(-1, 0, 1),
+    Coord::new(-1, 1, 0),
+    Coord::new(0, 1, -1),
+    Coord::new(1, 0, -1),
+];
 
-    input.lines().map(|line| {
-        let mut cursor = 0;
-        let mut out = Vec::new();
-
-        loop {
-            let (advance, coord) = match line[cursor..].as_bytes() {
-                [b'e', ..] => (1, Coord::new(1, -1, 0)),
-                [b's', b'e', ..] => (2, Coord::new(0, -1, 1)),
-                [b's', b'w', ..] => (2, Coord::new(-1, 0, 1)),
-                [b'w', ..] => (1, Coord::new(-1, 1, 0)),
-                [b'n', b'w', ..] => (2, Coord::new(0, 1, -1)),
-                [b'n', b'e', ..] => (2, Coord::new(1, 0, -1)),
-                _ => return out,
-            };
-
-            cursor += advance;
-            out.push(coord);
-        }
-    })
+fn flip(coord: Coord, set: &mut HashSet<Coord>) {
+    if !set.insert(coord) {
+        set.remove(&coord);
+    }
 }
 
 fn main() {
-    let directions = parse();
+    let to_flip = include_str!("input").lines().map(|line| {
+        let mut cursor = 0;
+        let mut coord = Coord::new(0, 0, 0);
+
+        loop {
+            let (advance, direction) = match line[cursor..].as_bytes() {
+                [b'e', ..] => (1, NEIGHBOURS[0]),
+                [b's', b'e', ..] => (2, NEIGHBOURS[1]),
+                [b's', b'w', ..] => (2, NEIGHBOURS[2]),
+                [b'w', ..] => (1, NEIGHBOURS[3]),
+                [b'n', b'w', ..] => (2, NEIGHBOURS[4]),
+                [b'n', b'e', ..] => (2, NEIGHBOURS[5]),
+                _ => return coord,
+            };
+
+            cursor += advance;
+            coord += direction;
+        }
+    });
 
     let mut flipped = HashSet::new();
-    for coords in directions {
-        let tile: Coord = coords.into_iter().sum();
-
-        if !flipped.insert(tile) {
-            flipped.remove(&tile);
-        }
+    for tile in to_flip {
+        flip(tile, &mut flipped);
     }
 
-    eprintln!("Part 1: {}", flipped.len());
+    println!("Part 1: {}", flipped.len());
+
+    for _ in 0..100 {
+        let mut next = flipped.clone();
+
+        flipped
+            .iter()
+            .filter(|&&tile| {
+                let nearby = tile.nearby(&flipped);
+
+                nearby == 0 || nearby > 2
+            })
+            .for_each(|tile| {
+                next.remove(tile);
+            });
+
+        next.extend(
+            flipped
+                .iter()
+                .copied()
+                .flat_map(Coord::neighbours)
+                .filter(|tile| {
+                    let nearby = tile.nearby(&flipped);
+
+                    nearby == 2
+                }),
+        );
+
+        flipped = next;
+    }
+
+    println!("Part 2: {}", flipped.len());
 }
